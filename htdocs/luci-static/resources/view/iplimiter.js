@@ -84,6 +84,7 @@ return view.extend({
 		stop.depends('schedule', 'cron');
 		var days = s.option(form.DynamicList, 'days', _('Days'));
 		days.depends('schedule', 'cron');
+		days.description = _('If no day is selected, the rule applies every day.');
 		[ 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun' ].forEach(function(day) {
 			days.value(day, _(day));
 		});

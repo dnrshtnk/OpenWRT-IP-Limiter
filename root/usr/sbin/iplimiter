@@ -3,10 +3,36 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r10
+SCRIPT_VERSION=1.0-r11
 
 log() {
 	logger -t iplimiter "$*"
+}
+
+set_router_clock() {
+	local clock_fields hour minute
+	clock_fields=$(date '+%Y-%m-%d %H:%M:%S %u %z')
+	set -- $clock_fields
+	ROUTER_DATE=$1
+	ROUTER_TIME=$2
+	ROUTER_ISO_DAY=$3
+	ROUTER_TZ=$4
+	hour=${ROUTER_TIME%%:*}
+	minute=${ROUTER_TIME#*:}
+	minute=${minute%:*}
+	ROUTER_HOUR=$(decimal "$hour")
+	ROUTER_MINUTE=$(decimal "$minute")
+	ROUTER_NOW=$((ROUTER_HOUR * 60 + ROUTER_MINUTE))
+	case "$ROUTER_ISO_DAY" in
+		1) ROUTER_DAY=mon ;;
+		2) ROUTER_DAY=tue ;;
+		3) ROUTER_DAY=wed ;;
+		4) ROUTER_DAY=thu ;;
+		5) ROUTER_DAY=fri ;;
+		6) ROUTER_DAY=sat ;;
+		7) ROUTER_DAY=sun ;;
+		*) ROUTER_DAY=unknown ;;
+	esac
 }
 
 is_active() {
@@ -15,7 +41,8 @@ is_active() {
 	[ "$enabled" = 1 ] || return 1
 	schedule=$(uci -q get "iplimiter.$section.schedule" || echo always)
 	[ "$schedule" = cron ] || return 0
-	days=$(uci -q get "iplimiter.$section.days" || echo 'mon,tue,wed,thu,fri,sat,sun')
+	days=$(uci -q get "iplimiter.$section.days" || true)
+	[ -n "$days" ] || days='mon,tue,wed,thu,fri,sat,sun'
 	start=$(uci -q get "iplimiter.$section.start" || echo 00:00)
 	stop=$(uci -q get "iplimiter.$section.stop" || echo 23:59)
 	case "$start:$stop" in *[!0-9:]*) return 1 ;; esac
@@ -25,9 +52,8 @@ is_active() {
 	hour=${stop%:*}; minute=${stop#*:}; [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || return 1
 	hour=$(decimal "$hour"); minute=$(decimal "$minute")
 	stop_min=$((hour * 60 + minute))
-	today=$(date +%a | tr '[:upper:]' '[:lower:]' | cut -c1-3)
-	hour=$(decimal "$(date +%H)"); minute=$(decimal "$(date +%M)")
-	now=$((hour * 60 + minute))
+	today=$ROUTER_DAY
+	now=$ROUTER_NOW
 	if [ "$start_min" -le "$stop_min" ]; then
 		case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
 		[ "$now" -ge "$start_min" ] && [ "$now" -lt "$stop_min" ]
@@ -35,7 +61,7 @@ is_active() {
 		if [ "$now" -ge "$start_min" ]; then
 			case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
 		else
-			weekday=$(date +%u)
+			weekday=$ROUTER_ISO_DAY
 			case "$weekday" in 1) yesterday=sun;; 2) yesterday=mon;; 3) yesterday=tue;; 4) yesterday=wed;; 5) yesterday=thu;; 6) yesterday=fri;; 7) yesterday=sat;; esac
 			case ",$days," in *",$yesterday,"*) ;; *) return 1 ;; esac
 		fi
@@ -126,6 +152,7 @@ apply() {
 	local nft_error_file="/var/run/iplimiter-nft-error.$$"
 	local state_data signature old_signature group_count=0 block_count=0 ipv4 ipv6 ip name_up name_down set_v4 set_v6
 	trap "rm -f '$hints_file' '$groups_file' '$blocks_file' '$unique_blocks_file' '$nft_file' '$nft_error_file'" EXIT INT TERM
+	set_router_clock
 
 	if ! ubus call luci-rpc getHostHints > "$hints_file" 2>/dev/null; then
 		log 'ERROR: cannot read host hints from ubus; leaving current nftables rules unchanged'
@@ -221,16 +248,20 @@ NFT_HEADER
 		return 1
 	fi
 	printf '%s\n' "$signature" > "$STATE_FILE"
-	log "Policy applied: speed groups=$group_count, blocked MACs=$block_count"
+	log "Policy applied at $ROUTER_DATE $ROUTER_TIME $ROUTER_TZ ($ROUTER_DAY, ISO day $ROUTER_ISO_DAY): speed groups=$group_count, blocked MACs=$block_count"
 	[ "$group_count" -gt 0 ] || log 'No speed rules are active for devices with known IP addresses'
 }
 
 case "${1:-apply}" in
 	version) echo "$SCRIPT_VERSION" ;;
+	clock)
+	set_router_clock
+	printf 'Router local time: %s %s (%s, ISO day %s)\n' "$ROUTER_DATE" "$ROUTER_TIME" "$ROUTER_TZ" "$ROUTER_DAY"
+	;;
 	apply) apply ;;
 	stop)
 	nft delete table inet iplimiter 2>/dev/null || true
 	rm -f "$STATE_FILE"
 	;;
-	*) echo "Usage: $0 {apply|stop|version}" >&2; exit 2 ;;
+	*) echo "Usage: $0 {apply|stop|version|clock}" >&2; exit 2 ;;
 esac
