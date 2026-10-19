@@ -1,7 +1,10 @@
 {
-	"admin/iplimiter": {
+	"luci-app-iplimiter": {
 		"description": "Manage per-client IP limiter settings",
-		"read": { "uci": [ "iplimiter" ], "ubus": { "luci-rpc": [ "getHostHints" ] } },
+		"read": {
+			"uci": [ "iplimiter" ],
+			"ubus": { "luci-rpc": [ "getHostHints" ] }
+		},
 		"write": { "uci": [ "iplimiter" ] }
 	}
 }

@@ -31,22 +31,19 @@ jobs:
           mkdir sdk
           tar --zstd -xf openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst -C sdk --strip-components=1
 
-      - name: Install LuCI feed
+      - name: Install LuCI feed and IP Limiter package
         run: |
           cd sdk
-          echo 'src-git luci https://github.com/openwrt/luci.git;openwrt-25.12' >> feeds.conf.default
+          grep -q '^src-git luci ' feeds.conf.default || echo 'src-git luci https://github.com/openwrt/luci.git;openwrt-25.12' >> feeds.conf.default
           ./scripts/feeds update luci
           ./scripts/feeds install luci-base
-
-      - name: Add IP Limiter package to SDK
-        run: |
-          mkdir -p sdk/package/luci-app-iplimiter
-          cp -a Makefile htdocs luasrc root sdk/package/luci-app-iplimiter/
-          cd sdk
+          mkdir -p feeds/luci/applications/luci-app-iplimiter
+          cp -a "$GITHUB_WORKSPACE/Makefile" "$GITHUB_WORKSPACE/htdocs" "$GITHUB_WORKSPACE/luasrc" "$GITHUB_WORKSPACE/root" feeds/luci/applications/luci-app-iplimiter/
+          ./scripts/feeds install luci-app-iplimiter
+          echo CONFIG_PACKAGE_luci-app-iplimiter=m >> .config
           make defconfig
-
       - name: Build package
-        run: make -C sdk package/luci-app-iplimiter/compile V=s
+        run: make -C sdk package/feeds/luci/luci-app-iplimiter/compile V=s
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -55,3 +52,9 @@ jobs:
           path: sdk/bin/packages/x86_64/luci/luci-app-iplimiter-*.apk
           if-no-files-found: error
           retention-days: 14
+
+
+
+
+
+
