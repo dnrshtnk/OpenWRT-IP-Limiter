@@ -46,13 +46,25 @@ jobs:
       - name: Build package
         run: make -C sdk package/feeds/luci/luci-app-iplimiter/compile V=s
 
+      - name: Collect APK artifact
+        run: |
+          mkdir -p dist
+          apk_file=$(find sdk/bin/packages -type f -name 'luci-app-iplimiter*.apk' -print -quit)
+          if [ -z "$apk_file" ]; then
+            echo 'No luci-app-iplimiter APK was found. Package output files:'
+            find sdk/bin/packages -type f -print | sort
+            exit 1
+          fi
+          echo "Found package: $apk_file"
+          cp "$apk_file" dist/
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: luci-app-iplimiter-openwrt-25.12.6-x86-64
-          path: sdk/bin/packages/x86_64/luci/luci-app-iplimiter-*.apk
+          path: dist/luci-app-iplimiter*.apk
           if-no-files-found: error
           retention-days: 14
+
 
 
 
