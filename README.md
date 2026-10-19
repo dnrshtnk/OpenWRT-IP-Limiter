@@ -8,7 +8,7 @@ LuCI package for OpenWrt 25.12.6 x86/64 and 25.12.5 MediaTek Filogic. The UI lis
 2. Push to `main` or `master`, or open **Actions → Build OpenWrt package → Run workflow**.
 3. Open the completed workflow run and download the artifact for your router:
    - `luci-app-iplimiter-openwrt-25.12.6-x86-64`
-   - `luci-app-iplimiter-openwrt-25.12.5-mediatek-filogic` (Xiaomi Mi Router AX3000T)
+   - `luci-app-iplimiter-openwrt-25.12.5-aarch64_cortex-a53` (Xiaomi Mi Router AX3000T)
 4. Transfer the APK to the router, then install it as root:
 
    ```sh
