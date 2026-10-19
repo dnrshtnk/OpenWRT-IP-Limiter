@@ -3,7 +3,7 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r8
+SCRIPT_VERSION=1.0-r9
 
 log() {
 	logger -t iplimiter "$*"
@@ -68,6 +68,9 @@ is_valid_ip() {
 collect_groups() {
 	local section mode rate macs mac safe_section ipv4 ipv6 ip matched_mac
 	local hints_file="$1" groups_file="$2"
+	# jshn.sh reads optional positional arguments without ${2-}; nounset
+	# would terminate ash while json_get_values parses the address arrays.
+	set +u
 	. /usr/share/libubox/jshn.sh
 	json_load "$(cat "$hints_file")" 2>/dev/null || json_load '{}'
 	: > "$groups_file"
@@ -110,6 +113,7 @@ collect_groups() {
 		fi
 		printf '%s|%s|%s|%s\n' "$safe_section" "$rate" "$ipv4" "$ipv6" >> "$groups_file"
 	done
+	set -u
 }
 
 apply() {
