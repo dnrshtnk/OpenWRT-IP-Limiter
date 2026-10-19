@@ -42,7 +42,10 @@ jobs:
           ./scripts/feeds update luci
           ./scripts/feeds install luci-app-iplimiter
           echo CONFIG_PACKAGE_luci-app-iplimiter=m >> .config
+          echo CONFIG_PACKAGE_liblua=m >> .config
           make defconfig
+      - name: Build Lua development files for LuCI dependencies
+        run: make -C sdk package/utils/lua5.3/compile V=s
       - name: Build package
         run: make -C sdk package/feeds/luci/luci-app-iplimiter/compile V=s
 
