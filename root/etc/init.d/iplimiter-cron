@@ -1,0 +1,14 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+start() {
+	mkdir -p /etc/crontabs
+	grep -q 'iplimiter apply' /etc/crontabs/root 2>/dev/null || echo '* * * * * /usr/sbin/iplimiter apply' >> /etc/crontabs/root
+	/etc/init.d/cron restart
+}
+
+stop() {
+	sed -i '\|/usr/sbin/iplimiter apply|d' /etc/crontabs/root
+	/etc/init.d/cron restart
+}

@@ -1,0 +1,51 @@
+#!/bin/sh
+# Refresh scheduled per-client blocks from UCI once per minute.
+set -eu
+
+is_active() {
+	local section="$1" enabled schedule start stop days today now start_min stop_min weekday yesterday hour minute
+	enabled=$(uci -q get "iplimiter.$section.enabled" || echo 1)
+	[ "$enabled" = 1 ] || return 1
+	schedule=$(uci -q get "iplimiter.$section.schedule" || echo always)
+	[ "$schedule" = cron ] || return 0
+	days=$(uci -q get "iplimiter.$section.days" || echo 'mon,tue,wed,thu,fri,sat,sun')
+	start=$(uci -q get "iplimiter.$section.start" || echo 00:00)
+	stop=$(uci -q get "iplimiter.$section.stop" || echo 23:59)
+	case "$start:$stop" in *[!0-9:]*) return 1 ;; esac
+	hour=${start%:*}; minute=${start#*:}; [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || return 1
+	start_min=$((hour * 60 + minute))
+	hour=${stop%:*}; minute=${stop#*:}; [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || return 1
+	stop_min=$((hour * 60 + minute))
+	today=$(date +%a | tr '[:upper:]' '[:lower:]' | cut -c1-3)
+	hour=$(date +%H); minute=$(date +%M); now=$((10#$hour * 60 + 10#$minute))
+	if [ "$start_min" -le "$stop_min" ]; then
+		case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
+		[ "$now" -ge "$start_min" ] && [ "$now" -lt "$stop_min" ]
+	else
+		if [ "$now" -ge "$start_min" ]; then
+			case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
+		else
+			weekday=$(date +%u)
+			case "$weekday" in 1) yesterday=sun;; 2) yesterday=mon;; 3) yesterday=tue;; 4) yesterday=wed;; 5) yesterday=thu;; 6) yesterday=fri;; 7) yesterday=sat;; esac
+			case ",$days," in *",$yesterday,"*) ;; *) return 1 ;; esac
+		fi
+		[ "$now" -ge "$start_min" ] || [ "$now" -lt "$stop_min" ]
+	fi
+}
+
+nft delete table inet iplimiter 2>/dev/null || true
+nft add table inet iplimiter
+nft 'add set inet iplimiter blocked { type ether_addr; }'
+nft 'add chain inet iplimiter forward { type filter hook forward priority -10; policy accept; }'
+nft 'add rule inet iplimiter forward ether saddr @blocked drop'
+nft 'add rule inet iplimiter forward ether daddr @blocked drop'
+
+for section in $(uci -q show iplimiter | sed -n "s/^iplimiter\.\([^.=]*\)=client$/\1/p"); do
+	mac=$(uci -q get "iplimiter.$section.mac" || true)
+	[ -n "$mac" ] || continue
+	case "$mac" in *[!A-Fa-f0-9:]*) continue ;; esac
+	is_active "$section" || continue
+	mode=$(uci -q get "iplimiter.$section.mode" || echo limit)
+	if [ "$mode" = block ]; then nft add element inet iplimiter blocked "{ $mac }" 2>/dev/null || true; fi
+done
+

@@ -1,0 +1,22 @@
+#!/bin/sh /etc/rc.common
+
+START=95
+USE_PROCD=1
+
+start_service() {
+	/etc/init.d/iplimiter-cron enable
+	/etc/init.d/iplimiter-cron start
+	/usr/sbin/iplimiter apply
+}
+
+stop_service() {
+	/etc/init.d/iplimiter-cron stop
+}
+
+service_triggers() {
+	procd_add_reload_trigger iplimiter network firewall
+}
+
+reload_service() {
+	/usr/sbin/iplimiter apply
+}
