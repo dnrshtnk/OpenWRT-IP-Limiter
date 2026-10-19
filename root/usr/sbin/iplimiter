@@ -3,7 +3,7 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r9
+SCRIPT_VERSION=1.0-r10
 
 log() {
 	logger -t iplimiter "$*"
@@ -125,7 +125,7 @@ apply() {
 	local nft_file="/var/run/iplimiter-rules.$$"
 	local nft_error_file="/var/run/iplimiter-nft-error.$$"
 	local state_data signature old_signature group_count=0 block_count=0 ipv4 ipv6 ip name_up name_down set_v4 set_v6
-	trap 'rm -f "$hints_file" "$groups_file" "$blocks_file" "$unique_blocks_file" "$nft_file" "$nft_error_file"' EXIT INT TERM
+	trap "rm -f '$hints_file' '$groups_file' '$blocks_file' '$unique_blocks_file' '$nft_file' '$nft_error_file'" EXIT INT TERM
 
 	if ! ubus call luci-rpc getHostHints > "$hints_file" 2>/dev/null; then
 		log 'ERROR: cannot read host hints from ubus; leaving current nftables rules unchanged'
