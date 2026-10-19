@@ -7,7 +7,6 @@ on:
     paths:
       - 'Makefile'
       - 'htdocs/**'
-      - 'luasrc/**'
       - 'root/**'
       - '.github/workflows/build-openwrt.yml'
 
@@ -31,30 +30,16 @@ jobs:
           mkdir sdk
           tar --zstd -xf openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst -C sdk --strip-components=1
 
-      - name: Install feeds and IP Limiter package
+      - name: Add package to SDK
         run: |
-          cd sdk
-          grep -q '^src-git luci ' feeds.conf.default || echo 'src-git luci https://github.com/openwrt/luci.git;openwrt-25.12' >> feeds.conf.default
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-          mkdir -p feeds/luci/applications/luci-app-iplimiter
-          cp -a "$GITHUB_WORKSPACE/Makefile" "$GITHUB_WORKSPACE/htdocs" "$GITHUB_WORKSPACE/luasrc" "$GITHUB_WORKSPACE/root" feeds/luci/applications/luci-app-iplimiter/
-          ./scripts/feeds update luci
-          ./scripts/feeds install luci-app-iplimiter
-
-      - name: Restore Lua source omitted from the SDK
-        run: |
-          git clone --depth 1 --branch v25.12.6 https://github.com/openwrt/openwrt.git openwrt-source
-          mkdir -p sdk/package/utils
-          cp -a openwrt-source/package/utils/lua5.3 sdk/package/utils/
+          mkdir -p sdk/package/luci-app-iplimiter
+          cp -a Makefile htdocs root sdk/package/luci-app-iplimiter/
           cd sdk
           echo CONFIG_PACKAGE_luci-app-iplimiter=m >> .config
-          echo CONFIG_PACKAGE_liblua=m >> .config
           make defconfig
-          make package/utils/lua5.3/compile V=s
 
-      - name: Build package
-        run: make -C sdk package/feeds/luci/luci-app-iplimiter/compile V=s
+      - name: Build package APK
+        run: make -C sdk package/luci-app-iplimiter/compile V=s
 
       - name: Collect APK artifact
         run: |
