@@ -3,7 +3,7 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r7
+SCRIPT_VERSION=1.0-r8
 
 log() {
 	logger -t iplimiter "$*"
@@ -20,11 +20,14 @@ is_active() {
 	stop=$(uci -q get "iplimiter.$section.stop" || echo 23:59)
 	case "$start:$stop" in *[!0-9:]*) return 1 ;; esac
 	hour=${start%:*}; minute=${start#*:}; [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || return 1
+	hour=$(decimal "$hour"); minute=$(decimal "$minute")
 	start_min=$((hour * 60 + minute))
 	hour=${stop%:*}; minute=${stop#*:}; [ "$hour" -le 23 ] && [ "$minute" -le 59 ] || return 1
+	hour=$(decimal "$hour"); minute=$(decimal "$minute")
 	stop_min=$((hour * 60 + minute))
 	today=$(date +%a | tr '[:upper:]' '[:lower:]' | cut -c1-3)
-	hour=$(date +%H); minute=$(date +%M); now=$((10#$hour * 60 + 10#$minute))
+	hour=$(decimal "$(date +%H)"); minute=$(decimal "$(date +%M)")
+	now=$((hour * 60 + minute))
 	if [ "$start_min" -le "$stop_min" ]; then
 		case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
 		[ "$now" -ge "$start_min" ] && [ "$now" -lt "$stop_min" ]
@@ -45,6 +48,15 @@ is_valid_mac() {
 		[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]) return 0 ;;
 		*) return 1 ;;
 	esac
+}
+
+# BusyBox ash does not support Bash's 10# arithmetic notation. Strip leading
+# zeroes so values such as 08 are evaluated as decimal rather than octal.
+decimal() {
+	local value="$1"
+	while [ "${value#0}" != "$value" ]; do value=${value#0}; done
+	[ -n "$value" ] || value=0
+	printf '%s' "$value"
 }
 
 is_valid_ip() {
