@@ -1,6 +1,12 @@
 #!/bin/sh
-# Refresh scheduled per-client blocks from UCI once per minute.
-set -eu
+# Apply per-group blocking and shared byte-rate policing through nftables.
+set -u
+
+STATE_FILE=/var/run/iplimiter-nft.state
+
+log() {
+	logger -t iplimiter "$*"
+}
 
 is_active() {
 	local section="$1" enabled schedule start stop days today now start_min stop_min weekday yesterday hour minute
@@ -33,21 +39,156 @@ is_active() {
 	fi
 }
 
-nft delete table inet iplimiter 2>/dev/null || true
-nft add table inet iplimiter
-nft 'add set inet iplimiter blocked { type ether_addr; }'
-nft 'add chain inet iplimiter forward { type filter hook forward priority -10; policy accept; }'
-nft 'add rule inet iplimiter forward ether saddr @blocked drop'
-nft 'add rule inet iplimiter forward ether daddr @blocked drop'
+is_valid_mac() {
+	case "$1" in
+		[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]) return 0 ;;
+		*) return 1 ;;
+	esac
+}
 
-for section in $(uci -q show iplimiter | sed -n "s/^iplimiter\.\([^.=]*\)=client$/\1/p"); do
-	is_active "$section" || continue
-	mode=$(uci -q get "iplimiter.$section.mode" || echo limit)
-	macs=$(uci -q get "iplimiter.$section.macs" || true)
-	[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
-	for mac in $macs; do
-		case "$mac" in *[!A-Fa-f0-9:]*) continue ;; esac
-		if [ "$mode" = block ]; then nft add element inet iplimiter blocked "{ $mac }" 2>/dev/null || true; fi
+is_valid_ip() {
+	case "$1" in *[!0-9A-Fa-f:.]*) return 1 ;; esac
+	case "$1" in *:*|*.*) return 0 ;; *) return 1 ;;
+	esac
+}
+
+collect_groups() {
+	local section mode rate macs mac safe_section ipv4 ipv6 ip
+	local hints_file="$1" groups_file="$2"
+	. /usr/share/libubox/jshn.sh
+	json_load "$(cat "$hints_file")" 2>/dev/null || json_load '{}'
+	: > "$groups_file"
+
+	for section in $(uci -q show iplimiter | sed -n "s/^iplimiter\.\([^.=]*\)=client$/\1/p"); do
+		is_active "$section" || continue
+		mode=$(uci -q get "iplimiter.$section.mode" || echo limit)
+		[ "$mode" = limit ] || continue
+		rate=$(uci -q get "iplimiter.$section.rate" || echo 0)
+		case "$rate" in ''|*[!0-9]*) continue ;; esac
+		[ "$rate" -ge 1 ] && [ "$rate" -le 10000000 ] || continue
+		safe_section=$(printf '%s' "$section" | sed 's/[^A-Za-z0-9_]/_/g')
+		macs=$(uci -q get "iplimiter.$section.macs" || true)
+		[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
+		ipv4=
+		ipv6=
+		for mac in $macs; do
+			is_valid_mac "$mac" || continue
+			_iplimiter_v4=
+			_iplimiter_v6=
+			json_select "$mac" 2>/dev/null || json_select "$(printf '%s' "$mac" | tr '[:upper:]' '[:lower:]')" 2>/dev/null || continue
+			json_get_values _iplimiter_v4 ipaddrs
+			json_get_values _iplimiter_v6 ip6addrs
+			json_select ..
+			for ip in $_iplimiter_v4; do is_valid_ip "$ip" && case "$ip" in *.*) ipv4="$ipv4 $ip" ;; esac; done
+			for ip in $_iplimiter_v6; do is_valid_ip "$ip" && case "$ip" in *:*) ipv6="$ipv6 $ip" ;; esac; done
+		done
+		ipv4=$(printf '%s\n' $ipv4 | awk 'NF && !seen[$0]++' | tr '\n' ' ')
+		ipv6=$(printf '%s\n' $ipv6 | awk 'NF && !seen[$0]++' | tr '\n' ' ')
+		[ -n "$ipv4$ipv6" ] || continue
+		printf '%s|%s|%s|%s\n' "$safe_section" "$rate" "$ipv4" "$ipv6" >> "$groups_file"
 	done
-done
+}
 
+apply() {
+	local section mode macs mac rate safe_section rate_bytes burst_bytes
+	local hints_file="/var/run/iplimiter-hints.$$"
+	local groups_file="/var/run/iplimiter-groups.$$"
+	local blocks_file="/var/run/iplimiter-blocks.$$"
+	local unique_blocks_file="/var/run/iplimiter-blocks-unique.$$"
+	local nft_file="/var/run/iplimiter-rules.$$"
+	local state_data signature old_signature group_count=0 ipv4 ipv6 ip name_up name_down set_v4 set_v6
+	trap 'rm -f "$hints_file" "$groups_file" "$blocks_file" "$unique_blocks_file" "$nft_file"' EXIT INT TERM
+
+	if ! ubus call luci-rpc getHostHints > "$hints_file" 2>/dev/null; then
+		log 'Cannot read host hints; leaving the current nftables rules unchanged'
+		return 1
+	fi
+	collect_groups "$hints_file" "$groups_file"
+	: > "$blocks_file"
+	for section in $(uci -q show iplimiter | sed -n "s/^iplimiter\.\([^.=]*\)=client$/\1/p"); do
+		is_active "$section" || continue
+		mode=$(uci -q get "iplimiter.$section.mode" || echo limit)
+		[ "$mode" = block ] || continue
+		macs=$(uci -q get "iplimiter.$section.macs" || true)
+		[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
+		for mac in $macs; do is_valid_mac "$mac" && printf '%s\n' "$mac" >> "$blocks_file"; done
+	done
+	awk '!seen[$0]++' "$blocks_file" > "$unique_blocks_file"
+	mv "$unique_blocks_file" "$blocks_file"
+
+	# Hash the effective policy so the cron refresh does not reset nft token
+	# buckets every minute. Rebuild only when an active rule or client IP changes.
+	state_data=$(uci -q show iplimiter; cat "$groups_file"; cat "$blocks_file")
+	signature=$(printf '%s' "$state_data" | md5sum | cut -d ' ' -f 1)
+	old_signature=$(cat "$STATE_FILE" 2>/dev/null || true)
+	if [ "$signature" = "$old_signature" ] && nft list table inet iplimiter >/dev/null 2>&1; then
+		return 0
+	fi
+	if [ -s "$groups_file" ] && {
+		[ "$(uci -q get 'firewall.@defaults[0].flow_offloading' || echo 0)" = 1 ] ||
+		[ "$(uci -q get 'firewall.@defaults[0].flow_offloading_hw' || echo 0)" = 1 ];
+	}; then
+		log 'Firewall flow offloading is enabled; it may bypass per-group rate rules'
+	fi
+
+	if nft list table inet iplimiter >/dev/null 2>&1; then
+		printf '%s\n' 'delete table inet iplimiter' > "$nft_file"
+	else
+		: > "$nft_file"
+	fi
+	cat >> "$nft_file" <<'NFT_HEADER'
+add table inet iplimiter
+add set inet iplimiter blocked { type ether_addr; }
+add chain inet iplimiter forward { type filter hook forward priority -10; policy accept; }
+add rule inet iplimiter forward ether saddr @blocked drop
+add rule inet iplimiter forward ether daddr @blocked drop
+NFT_HEADER
+
+	while IFS= read -r mac; do
+		[ -n "$mac" ] && printf 'add element inet iplimiter blocked { %s }\n' "$mac" >> "$nft_file"
+	done < "$blocks_file"
+
+	while IFS='|' read -r safe_section rate ipv4 ipv6; do
+		[ -n "$safe_section" ] || continue
+		group_count=$((group_count + 1))
+		name_up="lim_${safe_section}_up"
+		name_down="lim_${safe_section}_down"
+		# kbit/s * 1000 / 8 = 125 bytes/s. Keep a 100 ms burst,
+		# with a 1500-byte minimum so a full-size packet can pass.
+		rate_bytes=$((rate * 125))
+		burst_bytes=$((rate_bytes / 10))
+		[ "$burst_bytes" -ge 1500 ] || burst_bytes=1500
+		printf 'add limit inet iplimiter %s { rate over %s bytes/second burst %s bytes; }\n' "$name_up" "$rate_bytes" "$burst_bytes" >> "$nft_file"
+		printf 'add limit inet iplimiter %s { rate over %s bytes/second burst %s bytes; }\n' "$name_down" "$rate_bytes" "$burst_bytes" >> "$nft_file"
+		set_v4="grp_${safe_section}_v4"
+		set_v6="grp_${safe_section}_v6"
+		if [ -n "$ipv4" ]; then
+			printf 'add set inet iplimiter %s { type ipv4_addr; }\n' "$set_v4" >> "$nft_file"
+			printf 'add element inet iplimiter %s { %s }\n' "$set_v4" "$(printf '%s' "$ipv4" | sed 's/  */, /g; s/, $//')" >> "$nft_file"
+			printf 'add rule inet iplimiter forward ip saddr @%s limit name "%s" drop\n' "$set_v4" "$name_up" >> "$nft_file"
+			printf 'add rule inet iplimiter forward ip daddr @%s limit name "%s" drop\n' "$set_v4" "$name_down" >> "$nft_file"
+		fi
+		if [ -n "$ipv6" ]; then
+			printf 'add set inet iplimiter %s { type ipv6_addr; }\n' "$set_v6" >> "$nft_file"
+			printf 'add element inet iplimiter %s { %s }\n' "$set_v6" "$(printf '%s' "$ipv6" | sed 's/  */, /g; s/, $//')" >> "$nft_file"
+			printf 'add rule inet iplimiter forward ip6 saddr @%s limit name "%s" drop\n' "$set_v6" "$name_up" >> "$nft_file"
+			printf 'add rule inet iplimiter forward ip6 daddr @%s limit name "%s" drop\n' "$set_v6" "$name_down" >> "$nft_file"
+		fi
+	done < "$groups_file"
+
+	if ! nft -f "$nft_file"; then
+		log 'Unable to update nftables policy; keeping the previous rules if present'
+		return 1
+	fi
+	printf '%s\n' "$signature" > "$STATE_FILE"
+	[ "$group_count" -gt 0 ] || log 'No speed rules are active for devices with known IP addresses'
+}
+
+case "${1:-apply}" in
+	apply) apply ;;
+	stop)
+	nft delete table inet iplimiter 2>/dev/null || true
+	rm -f "$STATE_FILE"
+	;;
+	*) echo "Usage: $0 {apply|stop}" >&2; exit 2 ;;
+esac

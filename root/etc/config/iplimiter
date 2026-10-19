@@ -1,7 +1,4 @@
 config iplimiter 'main'
 	option enabled '1'
-	option lan_device 'br-lan'
-	# Optional override if the WAN device is not discovered from netifd:
-	# option wan_device 'wan'
 
 # LuCI creates one client section per device rule.

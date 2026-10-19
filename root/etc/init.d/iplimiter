@@ -11,6 +11,7 @@ start_service() {
 
 stop_service() {
 	/etc/init.d/iplimiter-cron stop
+	/usr/sbin/iplimiter stop
 }
 
 service_triggers() {

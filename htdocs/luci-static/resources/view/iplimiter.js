@@ -32,8 +32,8 @@ return view.extend({
 			return uci.get('iplimiter', section_id, 'name') || section_id;
 		};
 
-		var devices = s.option(form.MultiValue, 'macs', _('Devices'));
-		devices.multiple = true;
+		// DynamicList renders each selected MAC in its own row with a remove button.
+		var devices = s.option(form.DynamicList, 'macs', _('MAC Addresses'));
 		devices.rmempty = false;
 		Object.keys(hints).sort().forEach(function(addr) {
 			var hint = hints[addr] || {};
@@ -63,7 +63,8 @@ return view.extend({
 		mode.value('block', _('Block completely'));
 
 		var rate = s.option(form.Value, 'rate', _('Speed limit (kbit/s)'));
-		rate.datatype = 'and(uinteger,min(1))';
+		rate.datatype = 'and(uinteger,min(1),max(10000000))';
+		rate.description = _('Shared by all devices in this group, separately for download and upload.');
 		rate.depends('mode', 'limit');
 		rate.default = '1024';
 

@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-iplimiter
 PKG_VERSION:=1.0
-PKG_RELEASE:=2
+PKG_RELEASE:=6
 PKG_LICENSE:=GPL-2.0-only
 PKG_MAINTAINER:=OpenWrt IP Limiter
 
@@ -23,7 +23,7 @@ define Package/luci-app-iplimiter
 endef
 
 define Package/luci-app-iplimiter/description
-LuCI interface to select known devices by hostname and MAC, configure block rules and schedules, and store requested speed limits.
+LuCI interface to select known devices by hostname and MAC, configure group bandwidth limits, block rules, and schedules.
 endef
 
 define Package/luci-app-iplimiter/install

@@ -1,4 +1,4 @@
-name: Build OpenWrt package
+name: Build OpenWrt packages
 
 on:
   workflow_dispatch:
@@ -15,7 +15,27 @@ permissions:
 
 jobs:
   build:
+    name: Build ${{ matrix.label }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: OpenWrt 25.12.6 x86/64
+            release: '25.12.6'
+            target: x86/64
+            sdk: openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+            sha256: 1864152619092e781fa36a401960c8e9ae42d6a364c44ee5f0b197ca5f3c0fcc
+            downloads: https://downloads.openwrt.org/releases
+            artifact: luci-app-iplimiter-openwrt-25.12.6-x86-64
+          - label: OpenWrt 25.12.5 MediaTek Filogic
+            release: '25.12.5'
+            target: mediatek/filogic
+            sdk: openwrt-sdk-25.12.5-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+            sha256: ff4a38a397caa2cfe1c39e18f84ddede14878221b3593c3f2c4cfe24e3ec4c25
+            downloads: https://archive.openwrt.org/releases
+            artifact: luci-app-iplimiter-openwrt-25.12.5-mediatek-filogic
+
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -23,12 +43,18 @@ jobs:
       - name: Install build host dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip zlib1g-dev file wget zstd
 
-      - name: Download OpenWrt SDK 25.12.6 x86/64
+      - name: Download and verify OpenWrt SDK
+        env:
+          RELEASE: ${{ matrix.release }}
+          TARGET: ${{ matrix.target }}
+          SDK: ${{ matrix.sdk }}
+          SDK_SHA256: ${{ matrix.sha256 }}
+          DOWNLOADS: ${{ matrix.downloads }}
         run: |
-          wget -q https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
-          echo '1864152619092e781fa36a401960c8e9ae42d6a364c44ee5f0b197ca5f3c0fcc  openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst' | sha256sum -c -
+          wget -q "$DOWNLOADS/$RELEASE/targets/$TARGET/$SDK"
+          echo "$SDK_SHA256  $SDK" | sha256sum -c -
           mkdir sdk
-          tar --zstd -xf openwrt-sdk-25.12.6-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst -C sdk --strip-components=1
+          tar --zstd -xf "$SDK" -C sdk --strip-components=1
 
       - name: Add package to SDK
         run: |
@@ -54,9 +80,9 @@ jobs:
           cp "$apk_file" dist/
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: luci-app-iplimiter-openwrt-25.12.6-x86-64
+          name: ${{ matrix.artifact }}
           path: dist/luci-app-iplimiter*.apk
           if-no-files-found: error
           retention-days: 14
