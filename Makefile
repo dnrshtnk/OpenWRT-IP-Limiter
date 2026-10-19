@@ -8,6 +8,11 @@ PKG_MAINTAINER:=OpenWrt IP Limiter
 
 include $(INCLUDE_DIR)/package.mk
 
+# This package only installs scripts and LuCI assets; it has no source tree
+# with a Makefile for the OpenWrt default compile step.
+define Build/Compile
+endef
+
 define Package/luci-app-iplimiter
   SECTION:=luci
   CATEGORY:=LuCI
