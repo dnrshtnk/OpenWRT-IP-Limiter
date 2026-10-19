@@ -53,7 +53,7 @@ is_valid_ip() {
 }
 
 collect_groups() {
-	local section mode rate macs mac safe_section ipv4 ipv6 ip
+	local section mode rate macs mac safe_section ipv4 ipv6 ip matched_mac
 	local hints_file="$1" groups_file="$2"
 	. /usr/share/libubox/jshn.sh
 	json_load "$(cat "$hints_file")" 2>/dev/null || json_load '{}'
@@ -71,11 +71,14 @@ collect_groups() {
 		[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
 		ipv4=
 		ipv6=
+		matched_mac=0
 		for mac in $macs; do
+			mac=$(printf '%s' "$mac" | tr '[:lower:]' '[:upper:]')
 			is_valid_mac "$mac" || continue
 			_iplimiter_v4=
 			_iplimiter_v6=
 			json_select "$mac" 2>/dev/null || json_select "$(printf '%s' "$mac" | tr '[:upper:]' '[:lower:]')" 2>/dev/null || continue
+			matched_mac=1
 			json_get_values _iplimiter_v4 ipaddrs
 			json_get_values _iplimiter_v6 ip6addrs
 			json_select ..
@@ -84,7 +87,14 @@ collect_groups() {
 		done
 		ipv4=$(printf '%s\n' $ipv4 | awk 'NF && !seen[$0]++' | tr '\n' ' ')
 		ipv6=$(printf '%s\n' $ipv6 | awk 'NF && !seen[$0]++' | tr '\n' ' ')
-		[ -n "$ipv4$ipv6" ] || continue
+		if [ -z "$ipv4$ipv6" ]; then
+			if [ "$matched_mac" = 1 ]; then
+				log "Group '$section': selected device has no IP address in host hints; speed limit not installed"
+			else
+				log "Group '$section': none of the selected MAC addresses were found in host hints; speed limit not installed"
+			fi
+			continue
+		fi
 		printf '%s|%s|%s|%s\n' "$safe_section" "$rate" "$ipv4" "$ipv6" >> "$groups_file"
 	done
 }
@@ -96,11 +106,15 @@ apply() {
 	local blocks_file="/var/run/iplimiter-blocks.$$"
 	local unique_blocks_file="/var/run/iplimiter-blocks-unique.$$"
 	local nft_file="/var/run/iplimiter-rules.$$"
-	local state_data signature old_signature group_count=0 ipv4 ipv6 ip name_up name_down set_v4 set_v6
+	local state_data signature old_signature group_count=0 block_count=0 ipv4 ipv6 ip name_up name_down set_v4 set_v6
 	trap 'rm -f "$hints_file" "$groups_file" "$blocks_file" "$unique_blocks_file" "$nft_file"' EXIT INT TERM
 
 	if ! ubus call luci-rpc getHostHints > "$hints_file" 2>/dev/null; then
-		log 'Cannot read host hints; leaving the current nftables rules unchanged'
+		log 'ERROR: cannot read host hints from ubus; leaving current nftables rules unchanged'
+		return 1
+	fi
+	if ! jsonfilter -i "$hints_file" -e '@' >/dev/null 2>&1; then
+		log 'ERROR: ubus returned invalid host hints JSON; leaving current nftables rules unchanged'
 		return 1
 	fi
 	collect_groups "$hints_file" "$groups_file"
@@ -111,10 +125,18 @@ apply() {
 		[ "$mode" = block ] || continue
 		macs=$(uci -q get "iplimiter.$section.macs" || true)
 		[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
-		for mac in $macs; do is_valid_mac "$mac" && printf '%s\n' "$mac" >> "$blocks_file"; done
+		for mac in $macs; do
+			mac=$(printf '%s' "$mac" | tr '[:lower:]' '[:upper:]')
+			if is_valid_mac "$mac"; then
+				printf '%s\n' "$mac" >> "$blocks_file"
+			else
+				[ -n "$mac" ] && log "Group '$section': invalid MAC address '$mac' ignored"
+			fi
+		done
 	done
 	awk '!seen[$0]++' "$blocks_file" > "$unique_blocks_file"
 	mv "$unique_blocks_file" "$blocks_file"
+	block_count=$(wc -l < "$blocks_file" | tr -d ' ')
 
 	# Hash the effective policy so the cron refresh does not reset nft token
 	# buckets every minute. Rebuild only when an active rule or client IP changes.
@@ -177,10 +199,12 @@ NFT_HEADER
 	done < "$groups_file"
 
 	if ! nft -f "$nft_file"; then
-		log 'Unable to update nftables policy; keeping the previous rules if present'
+		log 'ERROR: unable to update nftables policy; generated rules follow'
+		while IFS= read -r line; do log "nft: $line"; done < "$nft_file"
 		return 1
 	fi
 	printf '%s\n' "$signature" > "$STATE_FILE"
+	log "Policy applied: speed groups=$group_count, blocked MACs=$block_count"
 	[ "$group_count" -gt 0 ] || log 'No speed rules are active for devices with known IP addresses'
 }
 
