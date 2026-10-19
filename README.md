@@ -1,6 +1,6 @@
 # LuCI IP Limiter — OpenWrt 25.12.6
 
-LuCI package for OpenWrt 25.12.6 x86/64. The UI lists devices learned by OpenWrt host hints by hostname and MAC, stores rules in UCI, and supports blocking a client immediately or on a weekly schedule.
+LuCI package for OpenWrt 25.12.6 x86/64. The UI lists devices learned by OpenWrt host hints by hostname and MAC, lets you select several devices in one named group, stores rules in UCI, and supports blocking a group immediately or on a weekly schedule.
 
 ## Build APK with GitHub Actions
 

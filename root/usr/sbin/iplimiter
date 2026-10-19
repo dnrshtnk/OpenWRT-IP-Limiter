@@ -41,11 +41,13 @@ nft 'add rule inet iplimiter forward ether saddr @blocked drop'
 nft 'add rule inet iplimiter forward ether daddr @blocked drop'
 
 for section in $(uci -q show iplimiter | sed -n "s/^iplimiter\.\([^.=]*\)=client$/\1/p"); do
-	mac=$(uci -q get "iplimiter.$section.mac" || true)
-	[ -n "$mac" ] || continue
-	case "$mac" in *[!A-Fa-f0-9:]*) continue ;; esac
 	is_active "$section" || continue
 	mode=$(uci -q get "iplimiter.$section.mode" || echo limit)
-	if [ "$mode" = block ]; then nft add element inet iplimiter blocked "{ $mac }" 2>/dev/null || true; fi
+	macs=$(uci -q get "iplimiter.$section.macs" || true)
+	[ -n "$macs" ] || macs=$(uci -q get "iplimiter.$section.mac" || true)
+	for mac in $macs; do
+		case "$mac" in *[!A-Fa-f0-9:]*) continue ;; esac
+		if [ "$mode" = block ]; then nft add element inet iplimiter blocked "{ $mac }" 2>/dev/null || true; fi
+	done
 done
 
