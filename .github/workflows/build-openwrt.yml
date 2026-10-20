@@ -60,7 +60,7 @@ jobs:
       - name: Add package to SDK
         run: |
           mkdir -p sdk/package/luci-app-iplimiter
-          cp -a Makefile htdocs root sdk/package/luci-app-iplimiter/
+          cp -a Makefile htdocs po root sdk/package/luci-app-iplimiter/
           cd sdk
           echo CONFIG_PACKAGE_luci-app-iplimiter=m >> .config
           make defconfig
