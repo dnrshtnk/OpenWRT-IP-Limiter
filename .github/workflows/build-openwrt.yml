@@ -57,6 +57,12 @@ jobs:
           mkdir sdk
           tar --zstd -xf "$SDK" -C sdk --strip-components=1
 
+      - name: Build LuCI translation compiler
+        run: |
+          git clone --depth 1 --branch openwrt-25.12 https://github.com/openwrt/luci.git luci-src
+          make -C luci-src/modules/luci-base/src po2lmo
+          install -D luci-src/modules/luci-base/src/po2lmo sdk/staging_dir/host/bin/po2lmo
+
       - name: Add package to SDK
         run: |
           mkdir -p sdk/package/luci-app-iplimiter

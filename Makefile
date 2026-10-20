@@ -2,15 +2,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-iplimiter
 PKG_VERSION:=1.0
-PKG_RELEASE:=12
+PKG_RELEASE:=13
 PKG_LICENSE:=GPL-2.0-only
 PKG_MAINTAINER:=OpenWrt IP Limiter
-PKG_BUILD_DEPENDS+=luci-base/host
 
 include $(INCLUDE_DIR)/package.mk
 
-# This package only installs scripts and LuCI assets; it has no source tree
-# with a Makefile for the OpenWrt default compile step.
+# The workflow builds po2lmo as a host utility and places it in the SDK staging
+# directory before compiling this package.
 define Build/Compile
 endef
 

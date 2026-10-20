@@ -3,7 +3,7 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r12
+SCRIPT_VERSION=1.0-r13
 
 log() {
 	logger -t iplimiter "$*"
