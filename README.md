@@ -1,4 +1,4 @@
-# LuCI IP Limiter — OpenWrt 25.12
+# LuCI IP Limiter — OpenWrt 25+
 
 [Русский](#русский) | [English](README.en.md)
 
