@@ -1,26 +1,37 @@
-# LuCI IP Limiter — OpenWrt 25.12.6
+# LuCI IP Limiter — OpenWrt 25.12
 
-LuCI package for OpenWrt 25.12.6 x86/64 and 25.12.5 MediaTek Filogic. The UI lists devices learned by OpenWrt host hints by hostname and MAC, lets you select several devices in one named group, applies a shared kbit/s cap to the group in both directions, and supports blocking a group immediately or on a weekly schedule.
+[Русский](#русский) | [English](README.en.md)
 
-The LuCI interface includes Russian translations and follows the language selected in LuCI.
+## Русский
 
-## Build APKs with GitHub Actions
+LuCI-приложение для OpenWrt 25.12. Оно показывает известные роутеру устройства по имени и MAC-адресу, позволяет объединять их в группы, задавать общий лимит скорости в кбит/с для загрузки и отдачи, полностью блокировать группу и включать правила по расписанию. Интерфейс приложения переведён на русский и следует выбранному в LuCI языку.
 
-1. Create a GitHub repository and upload this project, including `.github/workflows/build-openwrt.yml`.
-2. Push to `main` or `master`, or open **Actions → Build OpenWrt package → Run workflow**.
-3. Open the completed workflow run and download the artifact for your router:
-   - `luci-app-iplimiter-openwrt-25.12.6-x86-64`
-   - `luci-app-iplimiter-openwrt-25.12.5-aarch64_cortex-a53` (Xiaomi Mi Router AX3000T)
-4. Transfer the APK to the router, then install it as root:
+### Поддерживаемые устройства
 
-   ```sh
-   apk add --allow-untrusted /tmp/luci-app-iplimiter-*.apk
-   ```
+- OpenWrt 25.12.6, x86/64.
+- OpenWrt 25.12.5, MediaTek Filogic, архитектура `aarch64_cortex-a53` (в том числе Xiaomi Mi Router AX3000T).
 
-The workflow downloads and verifies the matching OpenWrt SDK before building each APK. Install the x86/64 APK on the 25.12.6 x86/64 router and the MediaTek Filogic APK on the 25.12.5 router.
+### Сборка APK
 
-## Current limits
+GitHub Actions собирает APK для обеих архитектур после отправки изменений в `main` или `master`. Сборку также можно запустить вручную: **Actions → Build OpenWrt packages → Run workflow**. В завершённом запуске скачайте артефакт для нужного роутера:
 
-Speed caps use nftables byte-rate limits with one shared token bucket per group and direction. Excess packets are dropped, so this is policing rather than a queue-based shaper; TCP flows back off while UDP traffic may lose packets above the cap. IPv4 and IPv6 addresses in a group share the same bucket. This method coexists with SQM and does not need `tc` or extra kernel modules. If firewall software or hardware flow offloading is enabled, it may bypass these rules; disable flow offloading for reliable enforcement. Blocking and weekly schedules are also supported. Schedules use router local time; the after-midnight segment of an overnight window belongs to its selected start day.
+- `luci-app-iplimiter-openwrt-25.12.6-x86-64`
+- `luci-app-iplimiter-openwrt-25.12.5-aarch64_cortex-a53`
 
-Hostnames are sourced from LuCI host hints. A client without a hostname is shown by MAC if OpenWrt reports a hint for it; disconnected devices may not be present in the list. For scheduled groups, leaving the day list empty means every day. Run `/usr/sbin/iplimiter clock` to inspect the router's local date, time, timezone, and weekday; policy-change log entries include the same clock information.
+### Установка прямо на роутере
+
+Если роутер подключён к интернету и на нём есть `curl` (либо `wget`), после отправки `install.sh` в GitHub можно запустить установщик так:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dnrshtnk/OpenWRT-IP-Limiter/refs/heads/main/install.sh | sh
+```
+
+Установщик проверит архитектуру, скачает APK во временную папку, сравнит версии и пропустит установку, если текущая версия такая же или новее. Для OpenWrt `sh` используйте именно конвейер `curl | sh`; Bash-синтаксис `<(curl ...)` в стандартной оболочке роутера может не поддерживаться. Роутеру необходим доступ к GitHub.
+
+### Ограничения
+
+Лимит скорости реализован через nftables: это ограничение с отбрасыванием пакетов сверх лимита, а не управление очередью. Для TCP скорость обычно снижается, UDP-пакеты сверх лимита теряются. Устройства одной группы делят общий лимит отдельно для каждого направления; адреса IPv4 и IPv6 также учитываются. Аппаратное или программное flow offloading может обходить правила, поэтому для корректного ограничения его следует отключить.
+
+Расписание использует местное время роутера; если дни не выбраны, правило действует каждый день. В ночном интервале после полуночи продолжает действовать день, в который интервал начался. Проверить часы роутера можно командой `/usr/sbin/iplimiter clock`.
+
+Список имён устройств берётся из host hints LuCI. Отключённые устройства или клиенты без сохранённых сведений могут отсутствовать в списке.
