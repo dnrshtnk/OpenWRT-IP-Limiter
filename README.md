@@ -2,6 +2,8 @@
 
 LuCI package for OpenWrt 25.12.6 x86/64 and 25.12.5 MediaTek Filogic. The UI lists devices learned by OpenWrt host hints by hostname and MAC, lets you select several devices in one named group, applies a shared kbit/s cap to the group in both directions, and supports blocking a group immediately or on a weekly schedule.
 
+The LuCI interface includes Russian translations and follows the language selected in LuCI.
+
 ## Build APKs with GitHub Actions
 
 1. Create a GitHub repository and upload this project, including `.github/workflows/build-openwrt.yml`.

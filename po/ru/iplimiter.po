@@ -1,0 +1,88 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "IP Limiter"
+msgstr "Ограничение устройств"
+
+msgid "Choose one or more known devices for each rule."
+msgstr "Выберите одно или несколько известных устройств для каждого правила."
+
+msgid "Device groups"
+msgstr "Группы устройств"
+
+msgid "Add device group"
+msgstr "Добавить группу устройств"
+
+msgid "Group name"
+msgstr "Название группы"
+
+msgid "For example: Kids"
+msgstr "Например: Дети"
+
+msgid "MAC Addresses"
+msgstr "MAC-адреса"
+
+msgid "saved rule"
+msgstr "сохранённое правило"
+
+msgid "Action"
+msgstr "Действие"
+
+msgid "Limit speed"
+msgstr "Ограничить скорость"
+
+msgid "Block completely"
+msgstr "Полностью заблокировать"
+
+msgid "Speed limit (kbit/s)"
+msgstr "Ограничение скорости (кбит/с)"
+
+msgid "Shared by all devices in this group, separately for download and upload."
+msgstr "Общий лимит для всех устройств группы, отдельно для загрузки и отдачи."
+
+msgid "Rule enabled"
+msgstr "Правило включено"
+
+msgid "Schedule"
+msgstr "Расписание"
+
+msgid "Always"
+msgstr "Всегда"
+
+msgid "Time window"
+msgstr "Временной интервал"
+
+msgid "Start time (HH:MM)"
+msgstr "Время начала (ЧЧ:ММ)"
+
+msgid "End time (HH:MM)"
+msgstr "Время окончания (ЧЧ:ММ)"
+
+msgid "Days"
+msgstr "Дни недели"
+
+msgid "If no day is selected, the rule applies every day."
+msgstr "Если дни не выбраны, правило действует каждый день."
+
+msgid "mon"
+msgstr "Пн"
+
+msgid "tue"
+msgstr "Вт"
+
+msgid "wed"
+msgstr "Ср"
+
+msgid "thu"
+msgstr "Чт"
+
+msgid "fri"
+msgstr "Пт"
+
+msgid "sat"
+msgstr "Сб"
+
+msgid "sun"
+msgstr "Вс"

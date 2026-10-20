@@ -2,9 +2,10 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-iplimiter
 PKG_VERSION:=1.0
-PKG_RELEASE:=11
+PKG_RELEASE:=12
 PKG_LICENSE:=GPL-2.0-only
 PKG_MAINTAINER:=OpenWrt IP Limiter
+PKG_BUILD_DEPENDS:=luci-base/host
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -38,6 +39,8 @@ define Package/luci-app-iplimiter/install
 	$(INSTALL_DIR) $(1)/usr/share/luci/menu.d $(1)/usr/share/rpcd/acl.d
 	$(INSTALL_DATA) ./root/usr/share/luci/menu.d/luci-app-iplimiter.json $(1)/usr/share/luci/menu.d/luci-app-iplimiter.json
 	$(INSTALL_DATA) ./root/usr/share/rpcd/acl.d/luci-app-iplimiter.json $(1)/usr/share/rpcd/acl.d/luci-app-iplimiter.json
+	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
+	po2lmo ./po/ru/iplimiter.po $(1)/usr/lib/lua/luci/i18n/iplimiter.ru.lmo
 endef
 
 $(eval $(call BuildPackage,luci-app-iplimiter))

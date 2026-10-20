@@ -7,6 +7,7 @@ on:
     paths:
       - 'Makefile'
       - 'htdocs/**'
+      - 'po/**'
       - 'root/**'
       - '.github/workflows/build-openwrt.yml'
 
