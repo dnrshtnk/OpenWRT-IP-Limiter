@@ -20,13 +20,27 @@ GitHub Actions builds APKs for both architectures when changes are pushed to `ma
 
 ### Install directly on the router
 
-If the router has internet access and `curl` (or `wget`) installed, push `install.sh` to GitHub and run:
+If the router has internet access and `curl` (or `wget`) installed, run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dnrshtnk/OpenWRT-IP-Limiter/refs/heads/main/install.sh | sh
 ```
 
-The installer checks the router architecture, downloads the APK to a temporary directory, compares versions, and skips installation if the same or a newer version is already installed. Use the `curl | sh` pipeline with OpenWrt's `sh`; Bash process substitution such as `<(curl ...)` may not be supported by the router shell. The router needs access to GitHub.
+The latest published GitHub Release must contain two APK assets with stable names: `luci-app-iplimiter-aarch64_cortex-a53.apk` and `luci-app-iplimiter-x86-64.apk`. You can add them manually from the corresponding Actions artifacts. The installer selects the asset for the router architecture, reads its version from APK metadata, and skips installation if the same or a newer version is already installed. Use the `curl | sh` pipeline with OpenWrt's `sh`; Bash process substitution such as `<(curl ...)` may not be supported by the router shell. The router needs access to GitHub.
+
+### Install an APK from `/tmp`
+
+Copy the matching APK to `/tmp` on the router, then run the command for your architecture:
+
+```sh
+# aarch64_cortex-a53
+apk add --allow-untrusted /tmp/luci-app-iplimiter-aarch64_cortex-a53.apk
+
+# x86/64
+apk add --allow-untrusted /tmp/luci-app-iplimiter-x86-64.apk
+```
+
+If the file still has its original name from the Actions artifact, use its actual name in `/tmp` instead.
 
 ### Limitations
 

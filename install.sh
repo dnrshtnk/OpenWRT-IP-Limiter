@@ -2,10 +2,7 @@
 set -eu
 
 PACKAGE='luci-app-iplimiter'
-APK_URL='https://github.com/dnrshtnk/OpenWRT-IP-Limiter/releases/download/1.0/luci-app-iplimiter-1.0-r13_aarch64_cortex-a53.apk'
-APK_NAME=${APK_URL##*/}
-EXPECTED_ARCH='aarch64_cortex-a53'
-APK_FILE="/tmp/$APK_NAME"
+RELEASE_URL='https://github.com/dnrshtnk/OpenWRT-IP-Limiter/releases/latest/download'
 
 log() {
 	printf '%s\n' "iplimiter: $*"
@@ -17,7 +14,7 @@ fail() {
 }
 
 cleanup() {
-	rm -f "$APK_FILE"
+	[ -n "${APK_FILE:-}" ] && rm -f "$APK_FILE"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -26,15 +23,13 @@ command -v apk >/dev/null 2>&1 || fail 'не найден apk; нужен OpenWr
 [ -r /etc/openwrt_release ] || fail 'не найден /etc/openwrt_release.'
 
 router_arch=$(sed -n "s/^DISTRIB_ARCH='\([^']*\)'$/\1/p" /etc/openwrt_release | head -n 1)
-[ "$router_arch" = "$EXPECTED_ARCH" ] || fail "APK предназначен для $EXPECTED_ARCH, архитектура роутера: ${router_arch:-не определена}."
-
-case "$APK_NAME" in
-	"$PACKAGE-"*_"$EXPECTED_ARCH".apk) ;;
-	*) fail "неожиданное имя APK: $APK_NAME" ;;
+case "$router_arch" in
+	aarch64_cortex-a53) APK_NAME='luci-app-iplimiter-aarch64_cortex-a53.apk' ;;
+	x86_64) APK_NAME='luci-app-iplimiter-x86-64.apk' ;;
+	*) fail "неподдерживаемая архитектура роутера: ${router_arch:-не определена}." ;;
 esac
-target_version=${APK_NAME#"$PACKAGE-"}
-target_version=${target_version%_"$EXPECTED_ARCH".apk}
-[ -n "$target_version" ] || fail 'не удалось определить версию APK.'
+APK_URL="$RELEASE_URL/$APK_NAME"
+APK_FILE="/tmp/$APK_NAME"
 
 if command -v curl >/dev/null 2>&1; then
 	log "скачиваю $APK_NAME..."
@@ -46,6 +41,14 @@ else
 	fail 'не найден curl или wget.'
 fi
 [ -s "$APK_FILE" ] || fail 'скачанный APK пуст.'
+
+# The release asset has a stable name; read the actual package identity and
+# version from the downloaded APK v3 metadata instead of its filename.
+metadata=$(apk adbdump "$APK_FILE") || fail 'не удалось прочитать метаданные APK.'
+package_name=$(printf '%s\n' "$metadata" | awk '$1 == "name:" { print $2; exit }')
+target_version=$(printf '%s\n' "$metadata" | awk '$1 == "version:" { print $2; exit }')
+[ "$package_name" = "$PACKAGE" ] || fail "в APK найден неожиданный пакет: ${package_name:-не определён}."
+[ -n "$target_version" ] || fail 'не удалось определить версию APK.'
 
 installed_version=$(apk list --installed --manifest "$PACKAGE" 2>/dev/null | awk -v package="$PACKAGE" '$1 == package { print $2; exit }')
 if [ -n "$installed_version" ]; then
