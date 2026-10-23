@@ -3,7 +3,7 @@
 set -u
 
 STATE_FILE=/var/run/iplimiter-nft.state
-SCRIPT_VERSION=1.0-r13
+SCRIPT_VERSION=1.0-r14
 
 log() {
 	logger -t iplimiter "$*"
@@ -35,6 +35,18 @@ set_router_clock() {
 	esac
 }
 
+is_selected_day() {
+	local days="$1" wanted="$2" day
+	[ -n "$days" ] || return 0
+	# LuCI stores DynamicList as a UCI list (space-separated when read by
+	# `uci get`); also accept comma-separated values from older configs.
+	days=$(printf '%s' "$days" | tr ',' ' ')
+	for day in $days; do
+		[ "$day" = "$wanted" ] && return 0
+	done
+	return 1
+}
+
 is_active() {
 	local section="$1" enabled schedule start stop days today now start_min stop_min weekday yesterday hour minute
 	enabled=$(uci -q get "iplimiter.$section.enabled" || echo 1)
@@ -42,7 +54,6 @@ is_active() {
 	schedule=$(uci -q get "iplimiter.$section.schedule" || echo always)
 	[ "$schedule" = cron ] || return 0
 	days=$(uci -q get "iplimiter.$section.days" || true)
-	[ -n "$days" ] || days='mon,tue,wed,thu,fri,sat,sun'
 	start=$(uci -q get "iplimiter.$section.start" || echo 00:00)
 	stop=$(uci -q get "iplimiter.$section.stop" || echo 23:59)
 	case "$start:$stop" in *[!0-9:]*) return 1 ;; esac
@@ -55,15 +66,15 @@ is_active() {
 	today=$ROUTER_DAY
 	now=$ROUTER_NOW
 	if [ "$start_min" -le "$stop_min" ]; then
-		case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
+		is_selected_day "$days" "$today" || return 1
 		[ "$now" -ge "$start_min" ] && [ "$now" -lt "$stop_min" ]
 	else
 		if [ "$now" -ge "$start_min" ]; then
-			case ",$days," in *",$today,"*) ;; *) return 1 ;; esac
+			is_selected_day "$days" "$today" || return 1
 		else
 			weekday=$ROUTER_ISO_DAY
 			case "$weekday" in 1) yesterday=sun;; 2) yesterday=mon;; 3) yesterday=tue;; 4) yesterday=wed;; 5) yesterday=thu;; 6) yesterday=fri;; 7) yesterday=sat;; esac
-			case ",$days," in *",$yesterday,"*) ;; *) return 1 ;; esac
+			is_selected_day "$days" "$yesterday" || return 1
 		fi
 		[ "$now" -ge "$start_min" ] || [ "$now" -lt "$stop_min" ]
 	fi
