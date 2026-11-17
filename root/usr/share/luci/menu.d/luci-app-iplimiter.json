@@ -1,6 +1,6 @@
 {
-	"admin/network/iplimiter": {
-		"title": "IP Limiter",
+	"admin/services/maclimiter": {
+		"title": "MAC Limiter",
 		"order": 90,
 		"action": { "type": "view", "path": "iplimiter" },
 		"depends": { "acl": [ "luci-app-iplimiter" ] }

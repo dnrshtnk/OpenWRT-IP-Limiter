@@ -3,8 +3,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "IP Limiter"
-msgstr "Ограничение устройств"
+msgid "MAC Limiter"
+msgstr "Ограничение по MAC-адресам"
 
 msgid "Choose one or more known devices for each rule."
 msgstr "Выберите одно или несколько известных устройств для каждого правила."

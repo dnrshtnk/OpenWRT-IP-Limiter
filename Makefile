@@ -2,14 +2,13 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-iplimiter
 PKG_VERSION:=1.0
-PKG_RELEASE:=14
+PKG_RELEASE:=15
 PKG_LICENSE:=GPL-2.0-only
-PKG_MAINTAINER:=OpenWrt IP Limiter
+PKG_MAINTAINER:=MAC Limiter
 
 include $(INCLUDE_DIR)/package.mk
 
-# The workflow builds po2lmo as a host utility and places it in the SDK staging
-# directory before compiling this package.
+# The Linux SDK must provide po2lmo in its host staging directory.
 define Build/Compile
 endef
 
@@ -17,7 +16,7 @@ define Package/luci-app-iplimiter
   SECTION:=luci
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
-  TITLE:=Per-device IP limiter and blocker
+  TITLE:=MAC Limiter
   DEPENDS:=+luci-base +nftables
   PKGARCH:=all
 endef

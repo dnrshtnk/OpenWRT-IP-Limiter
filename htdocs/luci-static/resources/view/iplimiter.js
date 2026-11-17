@@ -18,7 +18,7 @@ return view.extend({
 
 	render: function(data) {
 		var hints = data[0] || {};
-		var m = new form.Map('iplimiter', _('IP Limiter'),
+		var m = new form.Map('iplimiter', _('MAC Limiter'),
 			_('Choose one or more known devices for each rule.'));
 		var s = m.section(form.GridSection, 'client', _('Device groups'));
 		s.addremove = true;

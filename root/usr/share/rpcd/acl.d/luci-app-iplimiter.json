@@ -1,6 +1,6 @@
 {
 	"luci-app-iplimiter": {
-		"description": "Manage per-client IP limiter settings",
+		"description": "Manage MAC Limiter settings",
 		"read": {
 			"uci": [ "iplimiter" ],
 			"ubus": { "luci-rpc": [ "getHostHints" ] }

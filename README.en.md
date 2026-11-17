@@ -1,10 +1,10 @@
-# LuCI IP Limiter — OpenWrt 25.12
+# LuCI MAC Limiter — OpenWrt 25.12
 
 [Русский](README.md#русский) | [English](#english)
 
 ## English
 
-LuCI application for OpenWrt 25.12. It lists devices known to the router by hostname and MAC address, lets you group devices, set a shared speed limit in kbit/s for download and upload, block a group, and schedule rules. The app interface includes Russian translations and follows the language selected in LuCI.
+MAC Limiter is a LuCI application for OpenWrt 25.12. It lists devices known to the router by hostname and MAC address, lets you group devices, set a shared speed limit in kbit/s for download and upload, block a group, and schedule rules. The app interface includes Russian translations and follows the language selected in LuCI.
 
 ### Supported devices
 
@@ -13,10 +13,7 @@ LuCI application for OpenWrt 25.12. It lists devices known to the router by host
 
 ### Build APKs
 
-GitHub Actions builds APKs for both architectures when changes are pushed to `main` or `master`. You can also start a build manually from **Actions → Build OpenWrt packages → Run workflow**. Download the artifact for your router from the completed run:
-
-- `luci-app-iplimiter-openwrt-25.12.6-x86-64`
-- `luci-app-iplimiter-openwrt-25.12.5-aarch64_cortex-a53`
+Build APKs for both architectures on Linux with the OpenWrt SDK.
 
 ### Install directly on the router
 
@@ -26,7 +23,7 @@ If the router has internet access and `curl` (or `wget`) installed, run:
 curl -fsSL https://raw.githubusercontent.com/dnrshtnk/OpenWRT-IP-Limiter/refs/heads/main/install.sh | sh
 ```
 
-The latest published GitHub Release must contain two APK assets with stable names: `luci-app-iplimiter-aarch64_cortex-a53.apk` and `luci-app-iplimiter-x86-64.apk`. You can add them manually from the corresponding Actions artifacts. The installer selects the asset for the router architecture, reads its version from APK metadata, and skips installation if the same or a newer version is already installed. Use the `curl | sh` pipeline with OpenWrt's `sh`; Bash process substitution such as `<(curl ...)` may not be supported by the router shell. The router needs access to GitHub.
+The latest published GitHub Release must contain two APK assets with stable names: `luci-app-iplimiter-aarch64_cortex-a53.apk` and `luci-app-iplimiter-x86-64.apk`. The installer selects the asset for the router architecture, reads its version from APK metadata, and skips installation if the same or a newer version is already installed. Use the `curl | sh` pipeline with OpenWrt's `sh`; Bash process substitution such as `<(curl ...)` may not be supported by the router shell. The router needs access to GitHub.
 
 ### Install an APK from `/tmp`
 
